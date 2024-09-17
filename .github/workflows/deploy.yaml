@@ -1,0 +1,33 @@
+name: Deploy Frontend
+#main branch에 소스코드를 push 했을 때만 아래의 작업을 수행
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      #docker login
+      - run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ scrests.DOCKER_USERNAME}}" --password-stdin
+      #Dockerfile.dev를 이용해서 build
+      - run: docker build -t seonjiwon/react-test -f Dockerfile.dev .
+      #build한 이미지를 이용해서 실행
+      - run: docker run -e CI=true seonjiwon/react-test npm test
+
+      - name: Generate deployment package
+        run: zip -r deploy.zip . -x '*.git*'
+
+      - name: Deploy to EB
+        uses: einaregilsson/beanstalk-deploy@v18
+        with:
+          aws_accesskey: ${{ secrets.AWS_ACCESS_KEY}}
+          aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          application_name: react-docker-gh-test
+          environment_name: React-docker-gh-test-env
+          existing_bucket_name: elasticbeanstalk-ap-northeast-2-565393032489
+          region: ap-northeast-2
+          version_label: ${{ github.sha }}
+          deployment_package: deploy.zip
